@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
@@ -46,25 +45,36 @@ export default function SuperAdminDashboard() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
+    // Ambil dari localStorage "superadmin"
     const userData = localStorage.getItem("superadmin");
     if (!userData) {
       router.push("/login/superadmin");
       return;
     }
-    const parsedUser = JSON.parse(userData);
-    if (parsedUser.role !== "superadmin") {
+    try {
+      const parsedUser = JSON.parse(userData);
+      console.log("SuperAdmin user data:", parsedUser);
+      if (parsedUser.role !== "superadmin") {
+        router.push("/login/superadmin");
+        return;
+      }
+      setUser(parsedUser);
+      fetchAllData();
+      if (parsedUser.id) {
+        fetchProfile(parsedUser.id);
+      }
+    } catch (err) {
+      console.error("Parse error:", err);
       router.push("/login/superadmin");
-      return;
     }
-    setUser(parsedUser);
-    fetchAllData();
-    fetchProfile(parsedUser.id);
   }, [router]);
 
   const fetchProfile = async (userId) => {
     try {
+      console.log("Fetching profile for userId:", userId);
       const res = await fetch(`/api/users/profile?userId=${userId}`);
       const data = await res.json();
+      console.log("Profile response:", data);
       if (data.success) {
         setProfile(data.data);
         setProfileForm({
@@ -75,27 +85,11 @@ export default function SuperAdminDashboard() {
           password: "",
           newPassword: "",
         });
+      } else {
+        console.error("Profile API error:", data.message);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
-    }
-  };
-
-  // Fetch reports ketika filter berubah
-  useEffect(() => {
-    if (activeTab === "reports") {
-      fetchReports();
-    }
-  }, [reportFilter]);
-
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchUsers(), fetchReports(), fetchStats()]);
-    } catch (err) {
-      setError("Gagal mengambil data");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -132,6 +126,24 @@ export default function SuperAdminDashboard() {
       console.error("Error fetching stats:", err);
     }
   };
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchUsers(), fetchReports(), fetchStats()]);
+    } catch (err) {
+      setError("Gagal mengambil data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch reports ketika filter berubah
+  useEffect(() => {
+    if (activeTab === "reports") {
+      fetchReports();
+    }
+  }, [reportFilter, activeTab]);
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
@@ -366,7 +378,6 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Navbar */}
       <nav className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center space-x-1">
           <span className="text-2xl font-bold text-blue-400">Re:</span>
@@ -393,9 +404,7 @@ export default function SuperAdminDashboard() {
             Users
           </button>
           <button
-            onClick={() => {
-              setActiveTab("profile");
-            }}
+            onClick={() => setActiveTab("profile")}
             className={`px-3 py-1 rounded ${activeTab === "profile" ? "bg-blue-600" : "hover:bg-gray-700"}`}
           >
             Profile
@@ -409,9 +418,7 @@ export default function SuperAdminDashboard() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Welcome */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-800">
             Super Admin Dashboard
@@ -419,7 +426,6 @@ export default function SuperAdminDashboard() {
           <p className="text-gray-500">Welcome, {user.name || user.email}</p>
         </div>
 
-        {/* Stats Cards - hanya tampil di tab reports */}
         {activeTab === "reports" && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
             <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
@@ -467,7 +473,6 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* Error & Success Messages */}
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
             {error}
@@ -490,31 +495,31 @@ export default function SuperAdminDashboard() {
                 <div className="space-y-4">
                   <div className="border-b pb-3">
                     <p className="text-sm text-gray-500">Username</p>
-                    <p className="text-lg font-medium text-gray-900">
+                    <p className="text-lg font-medium text-gray-900 break-words">
                       {profile?.username || "-"}
                     </p>
                   </div>
                   <div className="border-b pb-3">
                     <p className="text-sm text-gray-500">Email</p>
-                    <p className="text-lg font-medium text-gray-900">
+                    <p className="text-lg font-medium text-gray-900 break-words">
                       {profile?.email || "-"}
                     </p>
                   </div>
                   <div className="border-b pb-3">
                     <p className="text-sm text-gray-500">Phone Number</p>
-                    <p className="text-lg font-medium text-gray-900">
+                    <p className="text-lg font-medium text-gray-900 break-words">
                       {profile?.phone_number || "-"}
                     </p>
                   </div>
                   <div className="border-b pb-3">
                     <p className="text-sm text-gray-500">NIK</p>
-                    <p className="text-lg font-medium text-gray-900">
+                    <p className="text-lg font-medium text-gray-900 break-words">
                       {profile?.ctzn_reg_number || "-"}
                     </p>
                   </div>
                   <button
                     onClick={() => setEditingProfile(true)}
-                    className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     Edit Profile
                   </button>
@@ -665,15 +670,13 @@ export default function SuperAdminDashboard() {
         {/* REPORTS SECTION */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b flex justify-between items-center">
+            <div className="p-4 border-b flex justify-between items-center flex-wrap gap-2">
               <h2 className="text-lg font-semibold text-gray-800">
                 All Reports
               </h2>
               <select
                 value={reportFilter}
-                onChange={(e) => {
-                  setReportFilter(e.target.value);
-                }}
+                onChange={(e) => setReportFilter(e.target.value)}
                 className="px-3 py-1 border rounded-lg text-sm text-gray-700"
               >
                 <option value="all">All Status</option>
@@ -695,35 +698,33 @@ export default function SuperAdminDashboard() {
               <div className="divide-y">
                 {reports.map((report) => (
                   <div key={report.id} className="p-4 hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800 break-words">
-                          {report.title || `Report #${report.id}`}
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          By: {report.reporter_name || "Unknown"} • Category:{" "}
-                          {report.category_name} •{" "}
-                          {new Date(
-                            report.date || report.created_at,
-                          ).toLocaleDateString("id-ID")}
-                        </p>
-                        <p className="text-gray-600 text-sm mt-2 line-clamp-2 break-words">
-                          {report.description}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          {getStatusBadge(report.status)}
-                          {report.filepicked && (
-                            <span className="text-xs text-gray-500">
-                              📎 {report.filepicked}
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex flex-col">
+                      <h3 className="font-semibold text-gray-800 break-words">
+                        {report.title || `Report #${report.id}`}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1 break-words">
+                        By: {report.reporter_name || "Unknown"} • Category:{" "}
+                        {report.category_name} •{" "}
+                        {new Date(
+                          report.date || report.created_at,
+                        ).toLocaleDateString("id-ID")}
+                      </p>
+                      <p className="text-gray-600 text-sm mt-2 break-words whitespace-pre-wrap">
+                        {report.description}
+                      </p>
+                      <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        {getStatusBadge(report.status)}
+                        {report.filepicked && (
+                          <span className="text-xs text-gray-500 break-words">
+                            📎 {report.filepicked}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() =>
                           handleDeleteReport(report.id, report.title)
                         }
-                        className="ml-4 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                        className="mt-2 self-start px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
                       >
                         Delete
                       </button>
@@ -756,7 +757,7 @@ export default function SuperAdminDashboard() {
               <p className="text-center py-20 text-gray-400">No users found</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[800px]">
                   <thead className="bg-gray-50 border-b">
                     <tr className="text-left text-sm text-gray-600">
                       <th className="p-3">ID</th>
@@ -775,18 +776,22 @@ export default function SuperAdminDashboard() {
                         className="text-sm"
                       >
                         <td className="p-3 text-gray-900">{u.id}</td>
-                        <td className="p-3 font-medium text-gray-900">
+                        <td className="p-3 font-medium text-gray-900 wrap-break-words max-w-37.5">
                           {u.username}
                         </td>
-                        <td className="p-3 text-gray-900">{u.email}</td>
-                        <td className="p-3 text-gray-900">
+                        <td className="p-3 text-gray-900 break-words max-w-[200px]">
+                          {u.email}
+                        </td>
+                        <td className="p-3 text-gray-900 break-words">
                           {u.phone_number || "-"}
                         </td>
-                        <td className="p-3 text-gray-900">
+                        <td className="p-3 text-gray-900 break-words">
                           {u.ctzn_reg_number || "-"}
                         </td>
-                        <td className="p-3">{getRoleBadge(u.role)}</td>
-                        <td className="p-3 space-x-2">
+                        <td className="p-3 whitespace-nowrap">
+                          {getRoleBadge(u.role)}
+                        </td>
+                        <td className="p-3 space-x-2 whitespace-nowrap">
                           <button
                             onClick={() => setEditingUser(u)}
                             className="text-blue-600 hover:underline text-xs"
@@ -821,7 +826,7 @@ export default function SuperAdminDashboard() {
         )}
       </div>
 
-      {/* MODAL ADD USER - same as before */}
+      {/* MODAL ADD USER */}
       {showAddUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
